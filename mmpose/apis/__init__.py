@@ -7,7 +7,7 @@ from .inference_3d import (extract_pose_sequence, inference_interhand_3d_model,
                            inference_mesh_model, inference_pose_lifter_model,
                            vis_3d_mesh_result, vis_3d_pose_result)
 from .inference_tracking import get_track_id, vis_pose_tracking_result
-from .test import multi_gpu_test, single_gpu_test
+from .test import multi_gpu_test, single_gpu_test, single_gpu_test_return_input
 from .train import init_random_seed, train_model
 
 __all__ = [
@@ -30,4 +30,5 @@ __all__ = [
     'init_random_seed',
     'collect_multi_frames',
     'inference_gesture_model',
+    'single_gpu_test_return_input'
 ]

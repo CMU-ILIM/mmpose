@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 from mmpose.core.bbox import bbox_xywh2cs
-from mmpose.core.post_processing import (affine_transform, fliplr_joints,
+from mmpose.core.post_processing import (affine_transform, fliplr_joints, fliplr_visibility,
                                          get_affine_transform, get_warp_matrix,
                                          warp_affine_joints)
 from mmpose.datasets.builder import PIPELINES
@@ -114,6 +114,11 @@ class TopDownRandomFlip:
         joints_3d_visible = results['joints_3d_visible']
         center = results['center']
 
+        if 'visibility' in results:
+            visibility = results['visibility']
+        else:
+            visibility = None
+
         # A flag indicating whether the image is flipped,
         # which can be used by child class.
         flipped = False
@@ -134,11 +139,17 @@ class TopDownRandomFlip:
                     results['ann_info']['flip_pairs'])
                 center[0] = img[0].shape[1] - center[0] - 1
 
+                if visibility is not None:
+                    visibility = fliplr_visibility(visibility, results['ann_info']['flip_pairs'])
+
         results['img'] = img
         results['joints_3d'] = joints_3d
         results['joints_3d_visible'] = joints_3d_visible
         results['center'] = center
         results['flipped'] = flipped
+
+        if visibility is not None:
+            results['visibility'] = visibility
 
         return results
 

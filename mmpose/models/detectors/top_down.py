@@ -3,6 +3,7 @@ import warnings
 
 import mmcv
 import numpy as np
+import torch
 from mmcv.image import imwrite
 from mmcv.utils.misc import deprecated_api_warning
 from mmcv.visualization.image import imshow
@@ -148,16 +149,34 @@ class TopDown(BasePose):
         if self.with_neck:
             output = self.neck(output)
         if self.with_keypoint:
-            output = self.keypoint_head(output)
+            output, output_vis = self.keypoint_head(output)
 
         # if return loss
         losses = dict()
         if self.with_keypoint:
+            # keypoint_losses = self.keypoint_head.get_loss(
+            #     output, target, target_weight)
+            # losses.update(keypoint_losses)
+            # keypoint_accuracy = self.keypoint_head.get_accuracy(
+            #     output, target, target_weight)
+            # losses.update(keypoint_accuracy)
+
+            # Get the target vis
+            # Extract ground truth visibility from img_metas
+            # TODO: maybe move this somewhere else? maybe inside the loss?
+            target_vis = []
+            for i, img_meta in enumerate(img_metas):
+                visibility_gt = (img_meta['visibility'][:, 0] == 2).astype(int)
+                target_vis.append(visibility_gt)
+            target_vis = np.stack(target_vis, axis=0)
+            target_vis = torch.Tensor(target_vis).long().cuda(non_blocking=True)
+
             keypoint_losses = self.keypoint_head.get_loss(
-                output, target, target_weight)
+                output, output_vis, target, target_weight, target_vis)
             losses.update(keypoint_losses)
+
             keypoint_accuracy = self.keypoint_head.get_accuracy(
-                output, target, target_weight)
+                output, output_vis, target, target_weight, target_vis)
             losses.update(keypoint_accuracy)
 
         return losses
@@ -175,8 +194,7 @@ class TopDown(BasePose):
         if self.with_neck:
             features = self.neck(features)
         if self.with_keypoint:
-            output_heatmap = self.keypoint_head.inference_model(
-                features, flip_pairs=None)
+            output_heatmap, output_vis = self.keypoint_head.inference_model(features, flip_pairs=None)
 
         if self.test_cfg.get('flip_test', True):
             img_flipped = img.flip(3)
@@ -184,7 +202,8 @@ class TopDown(BasePose):
             if self.with_neck:
                 features_flipped = self.neck(features_flipped)
             if self.with_keypoint:
-                output_flipped_heatmap = self.keypoint_head.inference_model(
+                # NOTE: the 2nd output is output_flipped_vis, but we won't use it
+                output_flipped_heatmap, _ = self.keypoint_head.inference_model(
                     features_flipped, img_metas[0]['flip_pairs'])
                 output_heatmap = (output_heatmap + output_flipped_heatmap)
                 if self.test_cfg.get('regression_flip_shift', False):
@@ -200,6 +219,7 @@ class TopDown(BasePose):
                 output_heatmap = None
 
             result['output_heatmap'] = output_heatmap
+            result['output_vis'] = output_vis
 
         return result
 

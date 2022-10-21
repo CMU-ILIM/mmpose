@@ -154,6 +154,8 @@ class TopDownCarFusionDataset(Kpt2dSviewRgbImgTopDownDataset):
             joints_3d[:, :2] = keypoints[:, :2]
             joints_3d_visible[:, :2] = np.minimum(1, keypoints[:, 2:3])
 
+            visibility = keypoints[:, 2:3]  # shape (14, 1)
+
             image_file = osp.join(self.img_prefix, self.id2name[img_id])
             rec.append({
                 'image_file': image_file,
@@ -163,7 +165,8 @@ class TopDownCarFusionDataset(Kpt2dSviewRgbImgTopDownDataset):
                 'joints_3d_visible': joints_3d_visible,
                 'dataset': self.dataset_name,
                 'bbox_score': 1,
-                'bbox_id': bbox_id
+                'bbox_id': bbox_id,
+                'visibility': visibility
             })
             bbox_id = bbox_id + 1
 
@@ -211,6 +214,81 @@ class TopDownCarFusionDataset(Kpt2dSviewRgbImgTopDownDataset):
         print(f'=> Total boxes after filter '
               f'low score@{self.det_bbox_thr}: {bbox_id}')
         return kpt_db
+
+    def evaluate_visibility(self, results, inputs):
+        num_corrects = 0
+        total_kps = 0
+        for result, input in zip(results, inputs):
+            preds = result['preds']
+            preds_vis = result['output_vis']
+            # boxes = result['boxes']
+            image_paths = result['image_paths']
+            # bbox_ids = result['bbox_ids']
+
+            gt_metas = input['img_metas'] #.data
+            # print(len(gt_metas), len(gt_metas[0]))
+            batch_size = len(image_paths)
+
+            assert len(gt_metas) == 1
+
+            for i in range(batch_size):
+                # pred_kps = preds[i]
+                # gt_kps = gt_metas[0][i]['joints_3d']  # TODO: find out why this 0 index
+
+                # # Transform back to the image (note the output_size and use_udp)
+                # gt_kps = transform_preds(coords=gt_kps[:, :2], center=gt_metas[0][i]['center'],
+                #                          scale=gt_metas[0][i]['scale'],
+                #                          output_size=(288, 384), use_udp=False)
+
+                # Visualize the detections
+                # input_img = cv2.imread(image_paths[i])[:, :, ::-1]
+                # img = vis_keypoints_car_rainbow(input_img, pred_kps.T)
+                # img = vis_keypoints_car_rainbow(img, gt_kps.T)
+                # plt.imshow(img)
+                # plt.show()
+
+                # TODO: hack the pred_vis here
+                pred_kps = preds[i]
+
+                # # Using thresholding
+                # pred_vis = pred_kps[:, 2] >= 0.8
+
+                # # Using clustering
+                # confidence_list = pred_kps[:, 2]
+                # confidence_list = confidence_list.reshape((-1, 1))
+                # # print(confidence_list)
+                # kmeans = KMeans(n_clusters=2, random_state=0).fit(confidence_list)
+                # cluster_centers = kmeans.cluster_centers_
+                # visible_cluster_idx = np.argmax(cluster_centers)
+                # # print(visible_cluster_idx)
+                # labels = kmeans.labels_
+                # # print('Labels before:', labels)
+                # visible_mask = labels == visible_cluster_idx
+                # occluded_mask = labels != visible_cluster_idx
+                # labels[visible_mask] = 1
+                # labels[occluded_mask] = 0
+                # pred_vis = labels
+                # # print('Labels after:', labels)
+
+                # Using supervised predicted visibility
+                pred_vis = preds_vis[i]
+                pred_vis = pred_vis.argmax(axis=1)
+
+                target_vis = gt_metas[0][i]['visibility'][:, 0]
+                target_vis = (target_vis == 2).astype(int)
+
+                mask = np.ones((14,), dtype=np.uint8)
+                mask[8] = 0
+                mask[13] = 0
+                mask = mask.astype(bool)
+
+                corrects = pred_vis[mask] == target_vis[mask]
+                num_corrects += corrects.sum()
+                total_kps += len(target_vis[mask])
+
+        print('Total kps:', total_kps)
+        print('Num corrects:', num_corrects)
+        print('Keypoint Visibility Accuracy: {:0.2f}'.format(num_corrects / total_kps * 100.))
 
     @deprecated_api_warning(name_dict=dict(outputs='results'))
     def evaluate(self, results, res_folder=None, metric='mAP', **kwargs):

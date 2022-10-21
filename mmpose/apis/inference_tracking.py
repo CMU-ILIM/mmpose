@@ -338,14 +338,20 @@ def vis_pose_tracking_result(model,
             raise NotImplementedError()
 
     elif dataset_info is not None:
-        kpt_num = dataset_info.keypoint_num
+        # kpt_num = dataset_info.keypoint_num
+        # skeleton = dataset_info.skeleton
+
         skeleton = dataset_info.skeleton
+        pose_kpt_color = dataset_info.pose_kpt_color
+        pose_link_color = dataset_info.pose_link_color
 
     for res in result:
         track_id = res['track_id']
         bbox_color = palette[track_id % len(palette)]
-        pose_kpt_color = palette[[track_id % len(palette)] * kpt_num]
-        pose_link_color = palette[[track_id % len(palette)] * len(skeleton)]
+
+        # pose_kpt_color = palette[[track_id % len(palette)] * kpt_num]
+        # pose_link_color = palette[[track_id % len(palette)] * len(skeleton)]
+
         img = model.show_result(
             img, [res],
             skeleton,

@@ -11,7 +11,7 @@ from mmcv.cnn import fuse_conv_bn
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import get_dist_info, init_dist, load_checkpoint
 
-from mmpose.apis import multi_gpu_test, single_gpu_test
+from mmpose.apis import multi_gpu_test, single_gpu_test, single_gpu_test_return_input
 from mmpose.datasets import build_dataloader, build_dataset
 from mmpose.models import build_posenet
 from mmpose.utils import setup_multi_processes
@@ -157,7 +157,9 @@ def main():
 
     if not distributed:
         model = MMDataParallel(model, device_ids=[args.gpu_id])
-        outputs = single_gpu_test(model, data_loader)
+        # outputs = single_gpu_test(model, data_loader)
+        outputs, inputs = single_gpu_test_return_input(model, data_loader)
+
     else:
         model = MMDistributedDataParallel(
             model.cuda(),
@@ -179,6 +181,8 @@ def main():
         for k, v in sorted(results.items()):
             print(f'{k}: {v}')
 
+        # evaluate visibility
+        results = dataset.evaluate_visibility(outputs, inputs)
 
 if __name__ == '__main__':
     main()

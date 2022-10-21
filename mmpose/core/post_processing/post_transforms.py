@@ -9,6 +9,21 @@ import cv2
 import numpy as np
 import torch
 
+def fliplr_visibility(visibility, flip_pairs):
+    """
+    Flip the visibility array horizontally.
+
+    :param visibility: np.ndarray([K,])
+    :param flip_pairs:
+    :return:
+    """
+    visibility_flipped = visibility.copy()
+    # Swap left-right parts
+    for left, right in flip_pairs:
+        visibility_flipped[left] = visibility[right]
+        visibility_flipped[right] = visibility[left]
+    return visibility_flipped
+
 
 def fliplr_joints(joints_3d, joints_3d_visible, img_width, flip_pairs):
     """Flip human joints horizontally.
